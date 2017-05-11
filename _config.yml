@@ -5,4 +5,6 @@ url:
 title: 
 keywords: 
 description: 
-author: 
+author:
+
+root: /wiki 
