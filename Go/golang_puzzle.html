@@ -1,0 +1,631 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <link rel="Stylesheet" type="text/css" href="/wiki/static/css/style.css">
+    <link rel="Stylesheet" type="text/css" href="/wiki/static/css/tango.css">
+    <link rel="shortcut icon" href="/wiki/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/wiki/favicon.ico" type="image/x-icon">
+    <link rel="alternate" type="application/atom+xml" href="atom.xml" title="Atom feed">
+    <title>golang解惑 - </title>
+    <meta name="keywords" content=""/>
+    <meta name="description" content=""/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  </head>
+
+  <body>
+    <div id="container">
+      
+<div id="header">
+  <div class="post-nav"><a href="/wiki/">Home</a>&nbsp;&#187;&nbsp;<a href="/wiki/#Go">Go</a>&nbsp;&#187;&nbsp;golang解惑
+    <span class="updated">Updated&nbsp;
+      2017-05-12
+    </span></div>
+</div>
+<div class="clearfix"></div>
+
+<div class="page_title">golang解惑</div>
+
+  <div class="toc"><span class="toctitle">Table of Contents</span><ul>
+<li><a href="#functions">Functions</a><ul>
+<li><a href="#_1">闭包</a></li>
+<li><a href="#defer">defer</a></li>
+<li><a href="#recover">recover</a></li>
+</ul>
+</li>
+<li><a href="#method">Method</a><ul>
+<li><a href="#struct">struct嵌套</a></li>
+<li><a href="#method-value">method value</a></li>
+<li><a href="#bitset">bitset</a></li>
+</ul>
+</li>
+<li><a href="#interfaces">Interfaces</a><ul>
+<li><a href="#_2">接口类型</a></li>
+<li><a href="#interface-satisfication">Interface Satisfication</a></li>
+<li><a href="#interface-values">Interface Values</a></li>
+<li><a href="#an-interface-containing-a-nil-pointer-is-non-nil">An interface Containing a Nil Pointer Is Non-Nil</a></li>
+<li><a href="#type-assertions">Type Assertions</a></li>
+</ul>
+</li>
+<li><a href="#reflection">Reflection</a><ul>
+<li><a href="#_3">类型和接口</a></li>
+<li><a href="#_4">接口的特色</a></li>
+<li><a href="#_5">镜像方法</a></li>
+<li><a href="#_6">值的设置</a></li>
+<li><a href="#_7">总结</a></li>
+<li><a href="#interface">interface的类型</a></li>
+<li><a href="#interface_1">interface的值</a></li>
+<li><a href="#kind">Kind</a></li>
+<li><a href="#interface_2">interface的函数</a></li>
+<li><a href="#_8">完整例子</a></li>
+<li><a href="#tips">Tips</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<h2 id="functions">Functions</h2>
+<h3 id="_1">闭包</h3>
+<p>通过一个例子来说明</p>
+<div class="hlcode"><pre><span class="kd">var</span> <span class="nx">rmdirs</span> <span class="p">[]</span><span class="kd">func</span><span class="p">()</span>
+<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">d</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">tempDirs</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">dir</span> <span class="o">:=</span> <span class="nx">d</span>
+    <span class="nx">os</span><span class="p">.</span><span class="nx">MkdirAll</span><span class="p">(</span><span class="nx">dir</span><span class="p">,</span> <span class="mo">0755</span><span class="p">)</span>
+    <span class="nx">rmdirs</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">rmdirs</span><span class="p">,</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span><span class="nx">os</span><span class="p">.</span><span class="nx">RemoveAll</span><span class="p">(</span><span class="nx">dir</span><span class="p">)})</span>
+<span class="p">}</span>
+
+<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">rmdir</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">rmdirs</span> <span class="p">{</span>
+    <span class="nx">rmdir</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>上面为什么需要用<code>dir: = d</code>赋值语句了，直接把d传进<code>RemoveAll</code>不就好了吗？</p>
+<p>在上面的代码中，for循环创建了一个新的作用域，其中dir被声明了，所有的在这个循环内的function value都会共享同一份dir的存储空间，因此，如果不采用上述代码，那么，传进function value的dir就会全部是一样的（都会是最后一个）。</p>
+<p>d有一个存储空间，虽然它的值一直在变化，但是RemoveAll中如果使用了d，那么RemoveAll会与d组成一个闭包，d的值在变化，闭包中的值也随之变化。</p>
+<h3 id="defer">defer</h3>
+<div class="hlcode"><pre>需要注意的是, defer调用的函数参数的值defer被定义时就确定了.
+</pre></div>
+
+
+<p>例如</p>
+<div class="hlcode"><pre><span class="nx">i</span> <span class="o">:=</span> <span class="mi">1</span>
+<span class="k">defer</span> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Deferred print:&quot;</span><span class="p">,</span> <span class="nx">i</span><span class="p">)</span>
+<span class="nx">i</span><span class="o">++</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Normal print:&quot;</span><span class="p">,</span> <span class="nx">i</span><span class="p">)</span>
+</pre></div>
+
+
+<p>打印的内容如下:</p>
+<div class="hlcode"><pre><span class="nx">Normal</span> <span class="nx">print</span><span class="p">:</span> <span class="mi">2</span>
+<span class="nx">Deferred</span> <span class="nx">print</span><span class="p">:</span> <span class="mi">1</span>
+</pre></div>
+
+
+<p>因此我们知道，在 "defer fmt.Println("Deferred print:", i)" 调用时，i 的值已经确定了，因此相当于 <strong>defer fmt.Println("Deferred print:", 1)</strong>了。</p>
+<div class="hlcode"><pre><span class="err">需要强调的时</span><span class="p">,</span> <span class="n">defer</span><span class="err">调用的函数参数的值在</span><span class="n">defer</span><span class="err">定义时就确定了</span><span class="p">,</span> <span class="err">而</span><span class="n">defer</span><span class="err">函数内部所使用的变量的值需要在这个函数运行时才确定</span><span class="p">.</span>
+</pre></div>
+
+
+<p>例如:</p>
+<div class="hlcode"><pre><span class="kd">func</span> <span class="nx">f1</span><span class="p">()</span> <span class="p">(</span><span class="nx">r</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">r</span> <span class="p">=</span> <span class="mi">1</span>
+    <span class="k">defer</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">r</span><span class="o">++</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+    <span class="p">}()</span>
+    <span class="nx">r</span> <span class="p">=</span> <span class="mi">2</span>
+    <span class="k">return</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">f1</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>上面的例子中, 最终打印的内容是 "3", 这是因为在 "r = 2" 赋值之后, 执行了 defer 函数, 因此在这个函数内, r 的值是2了, 自增后变为3.</p>
+<div class="hlcode"><pre>defer函数调用的执行时机是外层函数设置返回值之后, 并且在即将返回之前.
+</pre></div>
+
+
+<p>例如:</p>
+<div class="hlcode"><pre><span class="kd">func</span> <span class="nx">f1</span><span class="p">()</span> <span class="p">(</span><span class="nx">r</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">defer</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">r</span><span class="o">++</span>
+    <span class="p">}()</span>
+    <span class="k">return</span> <span class="mi">0</span>
+<span class="p">}</span>
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">f1</span><span class="p">())</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>上面 <strong>fmt.Println(f1())</strong> 打印的是什么呢? 正确答案是 1. 这是为什么呢?
+要弄明白这个问题, 我们需要牢记两点</p>
+<ul>
+<li>defer 函数调用的执行时机是外层函数设置返回值之后, 并且在即将返回之前</li>
+<li>return XXX 操作并不是原子的</li>
+</ul>
+<h3 id="recover">recover</h3>
+<p>函数中如果抛出一个panic的异常，可以在defer中通过recover捕获这个异常，那么recover函数会结束当前的panic状态，并且返回panic值。</p>
+<p>在一个主进程，多个协程处理逻辑的结构中，这个很重要，如果不用recover捕获panic异常，会导致整个进程出错而中断。</p>
+<h2 id="method">Method</h2>
+<p>在go中，实现面向对象编程的方法，即一个对象是指一个拥有method的值或变量，method是和指定类型关联的函数。</p>
+<p>实际上，在GO中，支持对任意的named type（包括函数）定义method。比如：</p>
+<div class="hlcode"><pre><span class="kd">type</span> <span class="nx">Path</span> <span class="p">[]</span><span class="nx">Point</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">path</span> <span class="nx">Path</span><span class="p">)</span> <span class="nx">Distance</span><span class="p">()</span> <span class="kt">float64</span> <span class="p">{</span>
+    <span class="nx">sum</span> <span class="o">:=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">path</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">i</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+            <span class="nx">sum</span> <span class="o">+=</span> <span class="nx">path</span><span class="p">[</span><span class="nx">i</span><span class="o">-</span><span class="mi">1</span><span class="p">].</span><span class="nx">Distance</span><span class="p">(</span><span class="nx">path</span><span class="p">[</span><span class="nx">i</span><span class="p">])</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>由于GO中，是以值传递的方式传函数参数的，如果希望method函数能够修改对象内部的状态的话，则需要定义receiver type为对象的指针（该指针可以为nil），如下：</p>
+<div class="hlcode"><pre><span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="o">*</span><span class="nx">Point</span><span class="p">)</span> <span class="nx">ScaleBy</span><span class="p">(</span><span class="nx">factor</span> <span class="kt">float64</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">p</span><span class="p">.</span><span class="nx">X</span> <span class="o">*=</span> <span class="nx">factor</span>
+    <span class="nx">p</span><span class="p">.</span><span class="nx">Y</span> <span class="o">*=</span> <span class="nx">factor</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>对于一个*Pointer类型的变量，GO也会隐式地调用Point.Distance函数，下面两种使用方式是等价的</p>
+<div class="hlcode"><pre><span class="nx">pptr</span><span class="p">.</span><span class="nx">Distance</span><span class="p">(</span><span class="nx">q</span><span class="p">)</span>
+<span class="p">(</span><span class="o">*</span><span class="nx">pptr</span><span class="p">).</span><span class="nx">Distance</span><span class="p">(</span><span class="nx">q</span><span class="p">)</span>
+</pre></div>
+
+
+<p>如上，采用第一种使用方式的时候，GO也会隐式地转成第二种使用方式。</p>
+<div class="hlcode"><pre>因为GO支持pointer receiver，因此，对本身是pointer类型的named type，不支持定义method。
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="kd">type</span> <span class="nx">P</span> <span class="o">*</span><span class="kt">int</span>
+<span class="kd">func</span> <span class="p">(</span><span class="nx">P</span><span class="p">)</span> <span class="nx">f</span><span class="p">()</span> <span class="p">{</span> <span class="cm">/* do something */</span> <span class="p">}</span> <span class="c1">//compile error</span>
+</pre></div>
+
+
+<h3 id="struct">struct嵌套</h3>
+<p>和field一样，通过匿名的struct组合，大的struct可以直接调用struct内部的field的method，如下</p>
+<div class="hlcode"><pre><span class="kd">type</span> <span class="nx">Point</span> <span class="kd">struct</span> <span class="p">{</span><span class="nx">X</span><span class="p">,</span> <span class="nx">Y</span> <span class="kt">float64</span><span class="p">}</span>
+<span class="kd">type</span> <span class="nx">ColoredPoint</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Point</span>
+    <span class="nx">Color</span> <span class="nx">color</span><span class="p">.</span><span class="nx">RGBA</span>
+<span class="p">}</span>
+
+<span class="kd">var</span> <span class="nx">cp</span> <span class="nx">ColoredPoint</span>
+<span class="nx">cp</span><span class="p">.</span><span class="nx">X</span> <span class="p">=</span> <span class="mi">1</span>
+<span class="nx">cp</span><span class="p">.</span><span class="nx">ScaleBy</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="c1">// calls the method of Point</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">Distance</span><span class="p">(</span><span class="nx">q</span><span class="p">.</span><span class="nx">Point</span><span class="p">))</span>
+</pre></div>
+
+
+<h3 id="method-value">method value</h3>
+<p>通常的，我们在一个操作中select和call一个method，例如<code>p.Distance()</code>，但是，也可以把select和call分开。selector p.Distance会产生一个method value，一个method绑定到了特定的对象p，这个函数可以保存起来供后面重复使用。</p>
+<div class="hlcode"><pre><span class="nx">p</span> <span class="o">:=</span> <span class="nx">Point</span><span class="p">{</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">}</span>
+<span class="nx">q</span> <span class="o">:=</span> <span class="nx">Point</span><span class="p">{</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">}</span>
+<span class="nx">distanceFromP</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">Distance</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">distanceFromP</span><span class="p">(</span><span class="nx">q</span><span class="p">))</span>
+
+<span class="nx">ScaleP</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">ScaleBy</span>
+<span class="nx">ScaleP</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="nx">ScaleP</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="nx">ScaleP</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+
+
+<p>method value通常在你需要一个变量表示多个method value中的一个的时候，非常有用，例如</p>
+<div class="hlcode"><pre><span class="kd">type</span> <span class="nx">Point</span> <span class="kd">struct</span> <span class="p">{</span><span class="nx">X</span><span class="p">,</span> <span class="nx">Y</span> <span class="kt">float64</span><span class="p">}</span>
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">Point</span><span class="p">)</span> <span class="nx">Add</span><span class="p">(</span><span class="nx">q</span> <span class="nx">Point</span><span class="p">)</span> <span class="nx">Point</span> <span class="p">{</span><span class="k">return</span> <span class="nx">Point</span><span class="p">{</span><span class="nx">p</span><span class="p">.</span><span class="nx">X</span> <span class="o">+</span> <span class="nx">q</span><span class="p">.</span><span class="nx">X</span><span class="p">,</span> <span class="nx">p</span><span class="p">.</span><span class="nx">Y</span> <span class="o">+</span> <span class="nx">q</span><span class="p">.</span><span class="nx">Y</span><span class="p">}}</span>
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">Point</span><span class="p">)</span> <span class="nx">Sub</span><span class="p">(</span><span class="nx">q</span> <span class="nx">point</span><span class="p">)</span> <span class="nx">Point</span> <span class="p">{</span><span class="k">return</span> <span class="nx">Point</span><span class="p">{</span><span class="nx">p</span><span class="p">.</span><span class="nx">X</span> <span class="o">-</span> <span class="nx">q</span><span class="p">.</span><span class="nx">X</span><span class="p">,</span> <span class="nx">p</span><span class="p">.</span><span class="nx">Y</span> <span class="o">-</span> <span class="nx">q</span><span class="p">.</span><span class="nx">Y</span><span class="p">}}</span>
+
+<span class="kd">type</span> <span class="nx">path</span> <span class="p">[]</span><span class="nx">Point</span>
+<span class="kd">func</span> <span class="p">(</span><span class="nx">path</span> <span class="nx">Path</span><span class="p">)</span> <span class="nx">TranslateBy</span><span class="p">(</span><span class="nx">offset</span> <span class="nx">Point</span><span class="p">,</span> <span class="nx">add</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">op</span> <span class="kd">func</span><span class="p">(</span><span class="nx">p</span><span class="p">,</span> <span class="nx">q</span> <span class="nx">Point</span><span class="p">)</span> <span class="nx">Point</span>
+    <span class="k">if</span> <span class="nx">add</span> <span class="p">{</span>
+        <span class="nx">op</span> <span class="p">=</span> <span class="nx">Point</span><span class="p">.</span><span class="nx">Add</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="nx">op</span> <span class="p">=</span> <span class="nx">Point</span><span class="p">.</span><span class="nx">Sub</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">path</span> <span class="p">{</span>
+        <span class="nx">path</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="nx">op</span><span class="p">(</span><span class="nx">path</span><span class="p">[</span><span class="nx">i</span><span class="p">],</span> <span class="nx">offset</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<h3 id="bitset">bitset</h3>
+<p>GO中没有set类型，虽然有时可以用map[T]bool来代替，但是，有时候bit set可以节省很多空间，如下</p>
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;fmt&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">type</span> <span class="nx">IntSet</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">words</span> <span class="p">[]</span><span class="kt">uint64</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">IntSet</span><span class="p">)</span> <span class="nx">Has</span><span class="p">(</span><span class="nx">x</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+    <span class="nx">word</span><span class="p">,</span> <span class="nx">bit</span> <span class="o">:=</span> <span class="nx">x</span><span class="o">/</span><span class="mi">64</span><span class="p">,</span> <span class="nb">uint</span><span class="p">(</span><span class="nx">x</span><span class="o">%</span><span class="mi">64</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">word</span> <span class="p">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">[</span><span class="nx">word</span><span class="p">]</span><span class="o">&amp;</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="nx">bit</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">IntSet</span><span class="p">)</span> <span class="nx">Add</span><span class="p">(</span><span class="nx">x</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">word</span><span class="p">,</span> <span class="nx">bit</span> <span class="o">:=</span> <span class="nx">x</span><span class="o">/</span><span class="mi">64</span><span class="p">,</span> <span class="nb">uint</span><span class="p">(</span><span class="nx">x</span><span class="o">%</span><span class="mi">64</span><span class="p">)</span>
+    <span class="k">for</span> <span class="nx">word</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">s</span><span class="p">.</span><span class="nx">words</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">[</span><span class="nx">word</span><span class="p">]</span> <span class="o">|=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="nx">bit</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">IntSet</span><span class="p">)</span> <span class="nx">UnionWith</span><span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">IntSet</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">for</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">tword</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">t</span><span class="p">.</span><span class="nx">words</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="o">|=</span> <span class="nx">tword</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="nx">s</span><span class="p">.</span><span class="nx">words</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">words</span><span class="p">,</span> <span class="nx">tword</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">s</span> <span class="nx">IntSet</span>
+    <span class="nx">s</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">s</span><span class="p">.</span><span class="nx">Has</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<h2 id="interfaces">Interfaces</h2>
+<p>在GO中，Interface是一种抽象类型，它不展示任何的内部的值，只提供一些method。因此，给定一个interface，你只知道它的几个method，对于内部的实现是无法知道的。</p>
+<p>一个具体的类型如果实现了interface里的所有方法，那么这个类型会自动地被认为是该interface的一个实例。</p>
+<h3 id="_2">接口类型</h3>
+<p>可以基于现有的interface组合出新的interface，例如</p>
+<div class="hlcode"><pre><span class="kd">type</span> <span class="nx">ReadWriter</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">Reader</span>
+    <span class="nx">Writer</span>
+<span class="p">}</span>
+<span class="kd">type</span> <span class="nx">ReadWriteCloser</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">Reader</span>
+    <span class="nx">Writer</span>
+    <span class="nx">Closer</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>上面的跟结构体的匿名field一样，method会自动地提升到大的interface中。</p>
+<h3 id="interface-satisfication">Interface Satisfication</h3>
+<p>当一个类型（通常为struct）包含某个interface中所有的methods时，则该类型satisfies这个interface。可以参考Java中的接口以及接口的实现。</p>
+<p>一个interface变量只能使用它本身所有的method，即使赋值给它的具体类型还有额外的method，也是无法调用的，例如</p>
+<div class="hlcode"><pre><span class="n">os</span><span class="p">.</span><span class="n">Stdout</span><span class="p">.</span><span class="n">Write</span><span class="p">([]</span><span class="n">byte</span><span class="p">(</span><span class="s">&quot;hello&quot;</span><span class="p">))</span>
+<span class="n">os</span><span class="p">.</span><span class="n">Stdout</span><span class="p">.</span><span class="n">Close</span><span class="p">()</span>
+
+<span class="n">var</span> <span class="n">w</span> <span class="n">io</span><span class="p">.</span><span class="n">Writer</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">Stdout</span>
+<span class="n">w</span><span class="p">.</span><span class="n">Write</span><span class="p">([]</span><span class="n">byte</span><span class="p">(</span><span class="s">&quot;hello&quot;</span><span class="p">))</span>
+<span class="n">w</span><span class="p">.</span><span class="n">Close</span><span class="p">()</span> <span class="c1">//compile error: interface only has write method</span>
+</pre></div>
+
+
+<h3 id="interface-values">Interface Values</h3>
+<p>Interface value包含两个组件，分别是具体地<strong>类型</strong>和类型的<strong>值</strong>，它们被称作interface的dynamic type和dynamic value。</p>
+<p>以一个简单的例子，来说明interface value，如下</p>
+<div class="hlcode"><pre><span class="kd">var</span> <span class="nx">w</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span>
+<span class="nx">w</span> <span class="p">=</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Stdout</span>
+<span class="nx">w</span> <span class="p">=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+<span class="nx">w</span> <span class="p">=</span> <span class="kc">nil</span>
+</pre></div>
+
+
+<p>对于语句1，创建了type和value都为nil的interface。</p>
+<p>对于语句2，创建了type为*os.File，value为Os.Stdout的interface</p>
+<p>对于语句3，创建了type为*bytes.Buffer,value为[]byte的interface</p>
+<p><a href="http://o8m1nd933.bkt.clouddn.com/blog/go/interface_values.png"><img alt="img" src="http://o8m1nd933.bkt.clouddn.com/blog/go/interface_values.png" /></a></p>
+<p>两个interface相等的条件为</p>
+<ul>
+<li>两个interface都为nil</li>
+<li>dynamic type和dynamic value都相等</li>
+</ul>
+<h3 id="an-interface-containing-a-nil-pointer-is-non-nil">An interface Containing a Nil Pointer Is Non-Nil</h3>
+<p>一个nil的interface和一个interface包含一个pointer为nil情况是不同的，如下</p>
+<div class="hlcode"><pre><span class="kd">const</span> <span class="nx">debug</span> <span class="p">=</span> <span class="kc">true</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">buf</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span>
+    <span class="k">if</span> <span class="nx">debug</span> <span class="p">{</span>
+        <span class="nx">buf</span> <span class="p">=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="nx">f</span><span class="p">(</span><span class="nx">buf</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">debug</span> <span class="p">{</span>
+        <span class="c1">//.... use buf</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">f</span><span class="p">(</span><span class="nx">out</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">out</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">out</span><span class="p">.</span><span class="nx">Write</span><span class="p">([]</span><span class="nb">byte</span><span class="p">(</span><span class="s">&quot;done!\n&quot;</span><span class="p">))</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>上述程序会panic在out.Write函数，当main调用f时，它会把type信息*byte.Buffer赋值给out的type，nil作为value赋值给out的value，因此，此时out不是nil的interface，于是，out调用write的时候就panic了。</p>
+<p>正确的写法是</p>
+<div class="hlcode"><pre><span class="c1">//io.Writer是interface，因此buf的type和value都为nil（interface == nil等价于type和value都为nil）</span>
+<span class="kd">var</span> <span class="nx">buf</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span> 
+<span class="k">if</span> <span class="nx">debug</span> <span class="p">{</span>
+    <span class="nx">buf</span> <span class="p">=</span> <span class="nx">new</span> <span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="nx">f</span><span class="p">(</span><span class="nx">buf</span><span class="p">)</span>
+</pre></div>
+
+
+<h3 id="type-assertions">Type Assertions</h3>
+<p>Type Assertions一般是<code>x.(T)</code>，其中x是interface类型，T是类型，称为asserted类型。Type Assertion检查interface的dynamic type是否和类型T匹配。</p>
+<ul>
+<li>如果asserted类型是<strong>具体的类型</strong>，并且dynamic type与之匹配了，那么x.(T)的返回值是x的dynamic value，否则，程序panic。</li>
+</ul>
+<div class="hlcode"><pre><span class="kd">var</span> <span class="nx">w</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span>
+<span class="nx">w</span> <span class="p">=</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Stdout</span>
+<span class="nx">f</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.(</span><span class="o">*</span><span class="nx">OS</span><span class="p">.</span><span class="nx">File</span><span class="p">)</span> <span class="c1">//success, f == OS.Stdout</span>
+<span class="nx">c</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.(</span><span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="c1">// panic</span>
+</pre></div>
+
+
+<ul>
+<li>如果asserted的类型T也是是<strong>interface类型</strong>，那么检查dynamic type是否满足T，如果检查通过，dynamic type和dynamic value保持不变，但是interface类型变为T。这种type assertion的意义是<strong>可以改变interface的method组合</strong>（能够新增method的数量）。</li>
+</ul>
+<div class="hlcode"><pre><span class="kd">var</span> <span class="nx">w</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span>
+<span class="nx">w</span> <span class="p">=</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Stdout</span>
+<span class="nx">rw</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.(</span><span class="nx">io</span><span class="p">.</span><span class="nx">ReadWriter</span><span class="p">)</span> <span class="c1">// success: *os.File has both Read and Write</span>
+
+<span class="nx">w</span> <span class="p">=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">ByteCounter</span><span class="p">)</span>
+<span class="nx">rw</span> <span class="p">=</span> <span class="nx">w</span><span class="p">.(</span><span class="nx">io</span><span class="p">.</span><span class="nx">ReadWriter</span><span class="p">)</span> <span class="c1">// panic: *ByteCounter has no read method</span>
+</pre></div>
+
+
+<h2 id="reflection">Reflection</h2>
+<p>reflection是golang中用来获取interface的type, value和method的方式。</p>
+<h3 id="_3">类型和接口</h3>
+<p>Go 是静态类型的。每一个变量有一个静态的类型，也就是说，有一个已知类型并且在编译时就确定下来了：int，float32，*MyType，[]byte 等等。如果定义</p>
+<div class="hlcode"><pre><span class="kd">type</span> <span class="nx">MyInt</span> <span class="kt">int</span> 
+<span class="kd">var</span> <span class="nx">i</span> <span class="kt">int</span> 
+<span class="kd">var</span> <span class="nx">j</span> <span class="nx">MyInt</span>
+</pre></div>
+
+
+<p>那么 i 的类型为 int 而 j 的类型为 MyInt。即使变量 i 和 j 有相同的底层类型，它们仍然是有不同的静态类型的。未经转换是不能相互赋值的。</p>
+<p><strong>在类型中有一个重要的类别就是接口类型，表达了固定的一个方法集合。</strong>一个接口变量可以存储任意实际值（非接口），只要这个值实现了接口的方法。例如</p>
+<div class="hlcode"><pre><span class="c1">// Reader 是包裹了基础的 Read 方法的接口。.</span>
+<span class="kd">type</span> <span class="nx">Reader</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">Read</span><span class="p">(</span><span class="nx">p</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">(</span><span class="nx">n</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">err</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Error</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="c1">// Writer 是包裹了基础 Write 方法的接口。</span>
+<span class="kd">type</span> <span class="nx">Writer</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">Write</span><span class="p">(</span><span class="nx">p</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">(</span><span class="nx">n</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">err</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Error</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">var</span> <span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span>
+<span class="nx">r</span> <span class="p">=</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Stdin</span>
+<span class="nx">r</span> <span class="p">=</span> <span class="nx">bufio</span><span class="p">.</span><span class="nx">NewReader</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+<span class="nx">r</span> <span class="p">=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="c1">// 等等</span>
+</pre></div>
+
+
+<p>有一个事情是一定要明确的，不论 r 保存了什么值，r 的类型总是 io.Reader：<strong>Go 是静态类型，而 r 的静态类型是 io.Reader</strong>。</p>
+<p>也有人说 Go 的接口是动态类型的，不过这是一种误解。它们是静态类型的：接口类型的变量总是有着相同的静态类型，这个值总是满足空接口，只是<strong>存储在接口变量中的值运行时有可能被改变类型</strong>。</p>
+<h3 id="_4">接口的特色</h3>
+<p>接口类型的变量存储了两个内容：赋值给变量实际的值和这个值的类型描述。例如</p>
+<div class="hlcode"><pre><span class="kd">var</span> <span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span> 
+<span class="nx">tty</span><span class="p">,</span> <span class="nx">err</span> <span class="p">=</span> <span class="nx">os</span><span class="p">.</span><span class="nx">OpenFile</span><span class="p">(</span><span class="s">&quot;/dev/tty&quot;</span><span class="p">,</span> <span class="nx">os</span><span class="p">.</span><span class="nx">O_RDWR</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> 
+<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span> 
+    <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">err</span> 
+<span class="p">}</span> 
+<span class="nx">r</span> <span class="p">=</span> <span class="nx">tty</span>
+</pre></div>
+
+
+<p>用模式的形式来表达 r 包含了的是 (value, type) 对，即 (tty, *os.File)。<strong>接口的静态类型决定了哪个方法可以通过接口变量调用，即便内部实际的值可能有一个更大的方法集</strong>。（接口静态类型的作用）</p>
+<p>一个很重要的细节是接口内部的对总是 (value, 实际类型) 的格式，而不会有 (value, 接口类型) 的格式。接口不能保存接口值。</p>
+<h3 id="_5">镜像方法</h3>
+<div class="hlcode"><pre><span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="nx">i</span> <span class="kd">interface</span><span class="p">{})</span> <span class="c1">//从接口值到反射对象</span>
+<span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nx">Value</span><span class="p">).</span><span class="nx">Interface</span><span class="p">()</span>    <span class="c1">//从反射对象到接口值</span>
+<span class="err">或者</span>
+<span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nx">Value</span><span class="p">).</span><span class="nx">Interface</span><span class="p">().(</span><span class="nx">valueType</span><span class="p">)</span> <span class="c1">//使用断言</span>
+</pre></div>
+
+
+<h3 id="_6">值的设置</h3>
+<p>举例：</p>
+<div class="hlcode"><pre><span class="kd">var</span> <span class="nx">x</span> <span class="kt">float64</span> <span class="p">=</span> <span class="mf">3.4</span> 
+<span class="nx">v</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="nx">x</span><span class="p">)</span> 
+<span class="nx">v</span><span class="p">.</span><span class="nx">SetFloat</span><span class="p">(</span><span class="mf">7.1</span><span class="p">)</span> <span class="c1">// Error: will panic.</span>
+
+<span class="nx">panic</span><span class="p">:</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">Value</span><span class="p">.</span><span class="nx">SetFloat</span> <span class="nx">using</span> <span class="nx">unaddressable</span> <span class="nx">value</span>
+</pre></div>
+
+
+<p>问题不在于值 7.1 不能地址化；在于 v 不可设置。原因是，v其实是x 的一个副本，而不是 x 本身。如果在反射值内部允许更新 x 的副本v，那么 x 本身不会收到影响。这会造成混淆，并且毫无意义，因此这是非法的。</p>
+<p>反射值需要某些<strong>内容的地址</strong>来修改它指向的东西。将上述例子改成：</p>
+<div class="hlcode"><pre><span class="kd">var</span> <span class="nx">x</span> <span class="kt">float64</span> <span class="p">=</span> <span class="mf">3.4</span> 
+<span class="nx">p</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">x</span><span class="p">)</span> <span class="c1">// 注意：获取 X 的地址</span>
+<span class="nx">v</span> <span class="o">:=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">Elem</span><span class="p">()</span>
+<span class="nx">v</span><span class="p">.</span><span class="nx">SetFloat</span><span class="p">(</span><span class="mf">7.1</span><span class="p">)</span>
+</pre></div>
+
+
+<p>如果要设置struct类型T的字段的值，需要T 的字段名要大写（可导出），因为只有可导出的字段是可设置的。</p>
+<h3 id="_7">总结</h3>
+<p>反射的规则如下：</p>
+<ul>
+<li>从接口值到反射对象的反射。</li>
+<li>从反射对象到接口值的反射。</li>
+<li>为了修改反射对象，其值必须可设置。</li>
+</ul>
+<p>参考：<a href="http://www.tuicool.com/articles/7NjaQn">GoLang反射的规则</a></p>
+<h3 id="interface">interface的类型</h3>
+<ul>
+<li>获取interface的type</li>
+</ul>
+<div class="hlcode"><pre><span class="nx">t</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">Typeof</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">t</span><span class="p">)</span> <span class="c1">//&quot;int&quot;</span>
+</pre></div>
+
+
+<p>Typeof用来获取某个interface的类型。</p>
+<h3 id="interface_1">interface的值</h3>
+<ul>
+<li>获取interface的value</li>
+</ul>
+<div class="hlcode"><pre><span class="nx">v</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span> <span class="c1">// &quot;3&quot;</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;%v\n&quot;</span><span class="p">,</span> <span class="nx">v</span><span class="p">)</span> <span class="c1">// &quot;3&quot;</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">String</span><span class="p">())</span> <span class="c1">// &quot;&lt;int 3&gt;&quot;</span>
+</pre></div>
+
+
+<ul>
+<li>设置interface的value</li>
+</ul>
+<div class="hlcode"><pre><span class="nx">x</span> <span class="o">:=</span> <span class="mi">2</span>
+<span class="nx">d</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">x</span><span class="p">).</span><span class="nx">Elem</span><span class="p">()</span> <span class="c1">// d refers to the variable x</span>
+<span class="nx">px</span> <span class="o">:=</span> <span class="nx">d</span><span class="p">.</span><span class="nx">Addr</span><span class="p">().</span><span class="nx">Interface</span><span class="p">.(</span><span class="o">*</span><span class="kt">int</span><span class="p">)</span> <span class="c1">// px := &amp;x</span>
+<span class="o">*</span><span class="nx">px</span> <span class="p">=</span> <span class="mi">3</span>
+<span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">x</span><span class="p">)</span>
+<span class="nx">d</span><span class="p">.</span><span class="nx">Set</span><span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span>
+</pre></div>
+
+
+<h3 id="kind">Kind</h3>
+<p>Type和Value都有Kind，就是实际类型（底层类型），如下：</p>
+<div class="hlcode"><pre><span class="nx">Bool</span>
+<span class="nx">Int</span> <span class="nx">Int8</span> <span class="nx">Int16</span> <span class="nx">Int32</span> <span class="nx">Int64</span> 
+<span class="nx">Uint</span> <span class="nx">Uint8</span> <span class="nx">Uint16</span> <span class="nx">Uint32</span> <span class="nx">Uint64</span> <span class="nx">Uintptr</span>
+<span class="nx">Float32</span> <span class="nx">Float64</span>
+<span class="nx">Complex64</span> <span class="nx">Complex128</span>
+<span class="nx">Array</span>
+<span class="nx">Chan</span>
+<span class="nx">Func</span>
+<span class="nx">Interface</span>
+<span class="nx">Map</span>
+<span class="nx">Ptr</span>
+<span class="nx">Slice</span>
+<span class="nx">String</span>
+<span class="nx">Struct</span>
+<span class="nx">UnsafePointer</span>
+</pre></div>
+
+
+<h3 id="interface_2">interface的函数</h3>
+<ul>
+<li>遍历struct的method</li>
+</ul>
+<div class="hlcode"><pre><span class="nx">v</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="nx">x</span><span class="p">)</span>
+<span class="nx">t</span> <span class="o">:=</span> <span class="nx">v</span><span class="p">.</span><span class="nx">Type</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nx">v</span><span class="p">.</span><span class="nx">NumMethod</span><span class="p">();</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+    <span class="nx">methodType</span> <span class="o">:=</span> <span class="nx">v</span><span class="p">.</span><span class="nx">Method</span><span class="p">(</span><span class="nx">i</span><span class="p">).</span><span class="nx">Type</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>通过NumMethod来遍历，获取到对应的Method，其类型是<code>reflect.Value</code>，通过其Call方法来调用该函数。</p>
+<ul>
+<li>通过函数名来调用</li>
+</ul>
+<div class="hlcode"><pre><span class="nx">args</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="nx">reflect</span><span class="p">.</span><span class="nx">Value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="nx">args</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">args</span><span class="p">,</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="nx">x</span><span class="p">))</span>
+<span class="nx">v</span><span class="p">.</span><span class="nx">MethodByName</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="nx">Call</span><span class="p">(</span><span class="nx">args</span><span class="p">)</span>
+</pre></div>
+
+
+<p>通过MethodByName获取到函数然后调用Call也能完成调用。</p>
+<h3 id="_8">完整例子</h3>
+<p>下面以一个完整的例子，来完整的展示reflect.Type,reflect.Value和reflect.Method的用法。</p>
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;fmt&quot;</span>
+    <span class="s">&quot;reflect&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">type</span> <span class="nx">Test</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">i</span> <span class="kt">int</span>
+    <span class="nx">f</span> <span class="kt">float64</span>
+    <span class="nx">m</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">int</span>
+    <span class="nx">v</span> <span class="p">[]</span><span class="kt">string</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">NewTest</span><span class="p">()</span> <span class="nx">Test</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">t</span> <span class="nx">Test</span>
+    <span class="nx">t</span><span class="p">.</span><span class="nx">m</span> <span class="p">=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">int</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">t</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">Test</span><span class="p">)</span> <span class="nx">SetI</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">t</span><span class="p">.</span><span class="nx">i</span> <span class="p">=</span> <span class="nx">i</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">Test</span><span class="p">)</span> <span class="nx">SetF</span><span class="p">(</span><span class="nx">f</span> <span class="kt">float64</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">t</span><span class="p">.</span><span class="nx">f</span> <span class="p">=</span> <span class="nx">f</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">Test</span><span class="p">)</span> <span class="nx">SetM</span><span class="p">(</span><span class="nx">key</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">value</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">t</span><span class="p">.</span><span class="nx">m</span><span class="p">[</span><span class="nx">key</span><span class="p">]</span> <span class="p">=</span> <span class="nx">value</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">Test</span><span class="p">)</span> <span class="nx">SetV</span><span class="p">(</span><span class="nx">value</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">t</span><span class="p">.</span><span class="nx">v</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">t</span><span class="p">.</span><span class="nx">v</span><span class="p">,</span> <span class="nx">value</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">t</span> <span class="o">:=</span> <span class="nx">NewTest</span><span class="p">()</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nx">TypeOf</span><span class="p">(</span><span class="nx">t</span><span class="p">))</span> <span class="c1">//main.Test</span>
+    <span class="nx">v</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">t</span><span class="p">)</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">Kind</span><span class="p">())</span> <span class="c1">// ptr</span>
+    <span class="nx">typ</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">TypeOf</span><span class="p">(</span><span class="nx">t</span><span class="p">)</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">v</span><span class="p">.</span><span class="nx">Type</span><span class="p">())</span> <span class="c1">// *main.Test</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nx">typ</span><span class="p">.</span><span class="nx">NumMethod</span><span class="p">();</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+        <span class="nx">method</span> <span class="o">:=</span> <span class="nx">typ</span><span class="p">.</span><span class="nx">Method</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;%s&quot;</span><span class="p">,</span> <span class="nx">method</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">t</span><span class="p">)</span> <span class="c1">// {0 0 map[] []}</span>
+    <span class="nx">args</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="nx">reflect</span><span class="p">.</span><span class="nx">Value</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="nx">args</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">args</span><span class="p">,</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="mf">2.16</span><span class="p">))</span>
+    <span class="nx">v</span><span class="p">.</span><span class="nx">MethodByName</span><span class="p">(</span><span class="s">&quot;SetF&quot;</span><span class="p">).</span><span class="nx">Call</span><span class="p">(</span><span class="nx">args</span><span class="p">)</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">t</span><span class="p">)</span> <span class="c1">// {0 2.16 map[] []}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<h3 id="tips">Tips</h3>
+<p><strong>静态类型</strong>：</p>
+<p>静态类型是指有一个已知类型并且在编译时就确定下来了，并且不会再改变。</p>
+<div class="hlcode"><pre><span class="kd">type</span> <span class="nx">MyInt</span> <span class="kt">int</span> 
+<span class="kd">var</span> <span class="nx">x</span> <span class="nx">MyInt</span> <span class="p">=</span> <span class="mi">7</span> 
+<span class="nx">v</span> <span class="o">:=</span> <span class="nx">reflect</span><span class="p">.</span><span class="nx">ValueOf</span><span class="p">(</span><span class="nx">x</span><span class="p">)</span>
+</pre></div>
+
+
+<p>这里，x的静态类型是MyInt，而不是int</p>
+<p><strong>实际类型</strong>：</p>
+<div class="hlcode"><pre><span class="nx">v</span><span class="p">.</span><span class="nx">Kind</span><span class="p">()</span>
+</pre></div>
+
+
+<p>通过Kind可以得到变量的实际类型，v的实际类型是int</p>
+    </div>
+    <div id="footer">
+      <span>
+        <p>Copyright © 2017 .
+        Powered by <a href="http://simiki.org/" target="_blank">Simiki</a>.</p>
+        <p>Site Generated 2017-05-13 16:06:41</p>
+      </span>
+    </div>
+  </body>
+</html>

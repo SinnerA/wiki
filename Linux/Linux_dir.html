@@ -1,0 +1,211 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <link rel="Stylesheet" type="text/css" href="/wiki/static/css/style.css">
+    <link rel="Stylesheet" type="text/css" href="/wiki/static/css/tango.css">
+    <link rel="shortcut icon" href="/wiki/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/wiki/favicon.ico" type="image/x-icon">
+    <link rel="alternate" type="application/atom+xml" href="atom.xml" title="Atom feed">
+    <title>Linux目录结构 - </title>
+    <meta name="keywords" content=""/>
+    <meta name="description" content=""/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  </head>
+
+  <body>
+    <div id="container">
+      
+<div id="header">
+  <div class="post-nav"><a href="/wiki/">Home</a>&nbsp;&#187;&nbsp;<a href="/wiki/#Linux">Linux</a>&nbsp;&#187;&nbsp;Linux目录结构
+    <span class="updated">Updated&nbsp;
+      2017-05-12
+    </span></div>
+</div>
+<div class="clearfix"></div>
+
+<div class="page_title">Linux目录结构</div>
+
+  <div class="toc"><span class="toctitle">Table of Contents</span><ul>
+<li><a href="#_1">历史原因</a></li>
+<li><a href="#_2">根目录结构</a></li>
+<li><a href="#usr">/usr目录结构</a></li>
+<li><a href="#var">/var目录结构</a></li>
+<li><a href="#_3">文件和目录颜色含义</a></li>
+</ul>
+</div>
+<h4 id="_1">历史原因</h4>
+<p><img alt="img" src="http://image.beekka.com/blog/201202/bg2012020601.jpg" /></p>
+<p>​   根目录下面有一个子目录/bin，用于存放二进制程序。但是，/usr子目录下面还有/usr/bin，以及/usr/local/bin，也用于存放二进制程序；某些系统甚至还有/opt/bin。它们有何区别？</p>
+<p>​   话说1969年，Ken Thompson和Dennis Ritchie在小型机PDP-7上发明了Unix系统，在1971年，他们将主机升级到了PDP-11，当时，他们使用一种叫做RK05的储存盘，一盘的容量大约是1.5MB，没过多久，操作系统（根目录）变得越来越大，一块盘已经装不下了。于是，他们加上了第二盘RK05，并且规定第一块盘专门放系统程序，第二块盘专门放用户自己的程序，因此挂载的目录点取名为/usr。也就是说，根目录”/”挂载在第一块盘，”/usr”目录挂载在第二块盘，除此之外，两块盘的目录结构完全相同，第一块盘的目录（/bin, /sbin, /lib, /tmp…）都在/usr目录下重新出现一次。</p>
+<p>​   后来，第二块盘也满了，他们只好又加了第三盘RK05，挂载的目录点取名为/home，并且规定/usr用于存放用户的程序，/home用于存放用户的数据。</p>
+<p>​   从此，这种目录结构就延续了下来，随着硬盘容量越来越大，各个目录的含义进一步得到明确。</p>
+<p><strong>/</strong>：存放系统程序，也就是At&amp;t开发的Unix程序。</p>
+<p><strong>/usr</strong>：存放Unix系统商（比如IBM和HP）开发的程序。</p>
+<p><strong>/usr/local</strong>：存放用户自己安装的程序。</p>
+<p><strong>/opt</strong>：在某些系统，用于存放第三方厂商开发的程序，所以取名为option，意为"选装"。</p>
+<h4 id="_2">根目录结构</h4>
+<ul>
+<li><strong>/bin (binary)</strong>：</li>
+</ul>
+<p>​ 存放Linux的常用命令，如 cp, grep, ls, dir, more, rm, cat 等命令</p>
+<ul>
+<li><strong>/boot</strong>：</li>
+</ul>
+<p>​ 这里存放的是启动Linux时使用的一些核心文件。如操作系统内核、引导程序Grub等</p>
+<ul>
+<li><strong>/dev</strong>：</li>
+</ul>
+<p>​ 在此目录中包含所有的系统设备文件，从此目录可以访问各种系统设备</p>
+<ul>
+<li><strong>/etc</strong>：</li>
+</ul>
+<p>​ 该目录中包含系统和应用软件的配置文件</p>
+<ul>
+<li><strong>/etc/passwd</strong>：</li>
+</ul>
+<p>​ 该目录中包含了系统中的用户描述信息，每行记录一个用户的信息</p>
+<ul>
+<li><strong>/home</strong>：</li>
+</ul>
+<p>​ 存储普通用户的个人文件，默认数据存放目录</p>
+<ul>
+<li><strong>/lib</strong>：</li>
+</ul>
+<p>​ 执这个目录里存放着系统最基本的共享链接库和内核模块，功能上类似于Windows里的.dll文件</p>
+<ul>
+<li><strong>/lib64</strong>：</li>
+</ul>
+<p>​ 64位系统有这个文件夹，64位程序的库</p>
+<ul>
+<li><strong>/lost+found</strong>：</li>
+</ul>
+<p>​ 这并不是Linux目录结构的组成部分，而是ext3文件系统用于保存丢失文件的地方。不恰当的关机操作和磁盘错误均会导致文件丢失，这意味着这些被标注为“在使用”，但却并未列于磁盘上的数据结构上。正常情况下，引导进程会运行fsck程序，该程序能发现这些文件。除了“/”分区上的这个目录外，在每个分区上均有一个lost+found目录。</p>
+<ul>
+<li><strong>/media</strong>：</li>
+</ul>
+<p>​ 可移动设备的挂载点，当前的操作系统通常会把U盘等设备自动挂载到该文件夹下</p>
+<ul>
+<li><strong>/mnt</strong>：</li>
+</ul>
+<p>​ 临时用于挂载文件系统的地方。一般情况下这个目录是空的，而在我们将要挂载分区时在这个目录下建立目录，再将我们将要访问的设备挂载在这个目录上，这样我们就可访问文件了</p>
+<ul>
+<li><strong>/opt</strong>：</li>
+</ul>
+<p>​ 多数第三方软件默认安装到此位置，如Adobe Reader、google-earth等。并不是每个系统都会创建这个目录</p>
+<ul>
+<li><strong>/proc</strong>：</li>
+</ul>
+<p>​ 它是存在于内存中的虚拟文件系统。里面保存了内核和进程的状态信息。多为文本文件，可以直接查看。如<em>/proc/cpuinfo</em>保存了有关CPU的信息</p>
+<ul>
+<li><strong>/root</strong>：</li>
+</ul>
+<p>​ 这是根用户的主目录。与保留给个人用户的<em>/home</em>下的目录很相似，该目录中还包含仅与根用户有关的条目</p>
+<ul>
+<li><strong>/sbin (system binary)</strong>：</li>
+</ul>
+<p>​ 供超级用户使用的可执行文件，里面多是系统管理命令，如fsck, reboot, shutdown, ifconfig等</p>
+<ul>
+<li><strong>/tmp</strong>：</li>
+</ul>
+<p>​ 保存临时文件</p>
+<ul>
+<li><strong>/usr (unix software resource)</strong>：</li>
+</ul>
+<p>​ 静态的用户级应用程序等</p>
+<ul>
+<li><strong>/var (variable)</strong>：</li>
+</ul>
+<p>​ 动态的程序数据等</p>
+<h4 id="usr">/usr目录结构</h4>
+<p>​   应注意，程序的配置文件、动态的数据文件等都不会存放到<em>/usr</em>，所以除了安装、卸载软件外，一般无需修改<em>/usr</em>中的内容。说在系统正常运行时，<em>/usr</em>甚至可以被只读挂载。由于这一特性，<em>/usr</em>常被划分在单独的分区，甚至有时多台计算机可以共享一个<em>/usr</em>。</p>
+<ul>
+<li>/usr/bin</li>
+</ul>
+<p>多数日常应用程序存放的位置。如果<em>/usr</em>被放在单独的分区中，Linux的单用户模式不能访问<em>/usr/bin</em>，所以对系统至关重要的程序不应放在此文件夹中。</p>
+<ul>
+<li>/usr/include</li>
+</ul>
+<p>存放C/C++头文件的目录</p>
+<ul>
+<li>/usr/lib</li>
+</ul>
+<p>系统的库文件</p>
+<ul>
+<li>/usr/local</li>
+</ul>
+<p>新装的系统中这个文件夹是空的，可以用于存放个人安装的软件。安装了本地软件的<em>/usr/local</em>里的目录结构与<em>/usr</em>相似</p>
+<ul>
+<li>/usr/sbin</li>
+</ul>
+<p>在单用户模式中不用的系统管理程序，如apache2等。</p>
+<ul>
+<li>/usr/share</li>
+</ul>
+<p>与架构无关的数据。多数软件安装在此。</p>
+<ul>
+<li>/usr/X11R6</li>
+</ul>
+<p>该目录用于保存运行X-Window所需的所有文件。该目录中还包含用于运行GUI要的配置文件和二进制文件。</p>
+<ul>
+<li>/usr/src</li>
+</ul>
+<p>源代码</p>
+<h4 id="var">/var目录结构</h4>
+<p>​   <em>/var</em>中包括了一些数据文件，如系统日志等。<em>/var</em>的存放使得<em>/usr</em>被只读挂载成为可能</p>
+<ul>
+<li>/var/cache</li>
+</ul>
+<p>应用程序的缓存文件</p>
+<ul>
+<li>/var/lib</li>
+</ul>
+<p>应用程序的信息、数据。如数据库的数据等都存放在此文件夹。</p>
+<ul>
+<li>/var/local</li>
+</ul>
+<p><em>/usr/local</em>中程序的信息、数据</p>
+<ul>
+<li>/var/lock</li>
+</ul>
+<p>锁文件</p>
+<ul>
+<li>/var/log</li>
+</ul>
+<p>日志文件</p>
+<ul>
+<li>/var/opt</li>
+</ul>
+<p><em>/opt</em>中程序的信息、数据</p>
+<ul>
+<li>/var/run</li>
+</ul>
+<p>正在执行着的程序的信息，如PID文件应存放于此</p>
+<ul>
+<li>/var/spool</li>
+</ul>
+<p>存放程序的假脱机数据（即spool data）</p>
+<ul>
+<li>/var/tmp</li>
+</ul>
+<p>临时文件</p>
+<h4 id="_3">文件和目录颜色含义</h4>
+<ul>
+<li>蓝色表示目录； </li>
+<li>绿色表示可执行文件； </li>
+<li>红色表示压缩文件； </li>
+<li>浅蓝色表示链接文件； </li>
+<li>灰色表示其它文件； </li>
+<li>红色闪烁表示链接的文件有问题了； </li>
+<li>黄色是设备文件，包括block, char, fifo。 </li>
+</ul>
+<p>用dircolors -p看到缺省的颜色设置，包括各种颜色和“粗体”，下划线，闪烁等定义。</p>
+    </div>
+    <div id="footer">
+      <span>
+        <p>Copyright © 2017 .
+        Powered by <a href="http://simiki.org/" target="_blank">Simiki</a>.</p>
+        <p>Site Generated 2017-05-13 16:06:41</p>
+      </span>
+    </div>
+  </body>
+</html>
