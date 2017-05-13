@@ -1,10 +1,8 @@
-# Document:
-# http://simiki.org/docs/configuration.html
-
-url: 
-title: 
-keywords: 
+url: https://sinnera.github.io/wiki/
+title: Wiki | SinnerA
+keywords: wiki, makrdown, go, java, linux
 description: 
-author:
+author: SinnerA
+theme: simple2
 
 root: /wiki
