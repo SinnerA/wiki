@@ -1,0 +1,320 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <link rel="Stylesheet" type="text/css" href="/wiki/static/css/style.css">
+    <link rel="Stylesheet" type="text/css" href="/wiki/static/css/tango.css">
+    <link rel="shortcut icon" href="/wiki/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/wiki/favicon.ico" type="image/x-icon">
+    <link rel="alternate" type="application/atom+xml" href="atom.xml" title="Atom feed">
+    <title>Go1.6.3-cgo - Wiki | SinnerA</title>
+    <meta name="keywords" content="wiki, makrdown, go, java, linux"/>
+    <meta name="description" content=""/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  </head>
+
+  <body>
+    <div id="container">
+      
+<div id="header">
+  <div class="post-nav"><a href="/wiki/">Home</a>&nbsp;&#187;&nbsp;<a href="/wiki/#Go">Go</a>&nbsp;&#187;&nbsp;Go1.6.3-cgo
+    <span class="updated">Updated&nbsp;
+      2017-05-16
+    </span></div>
+</div>
+<div class="clearfix"></div>
+
+<div class="page_title">Go1.6.3-cgo</div>
+
+  <div class="toc"><span class="toctitle">Table of Contents</span><ul>
+<li><a href="#go163-cgo">Go1.6.3 - cgo</a><ul>
+<li><a href="#c">引入C代码</a><ul>
+<li><a href="#1-go">1. Go中直接引入</a></li>
+<li><a href="#2-goc">2. 在Go中引入C文件</a></li>
+<li><a href="#3-go">3. 在Go中引入静态链接库</a></li>
+<li><a href="#4-go">4. 在Go中引入动态链接库</a></li>
+</ul>
+</li>
+<li><a href="#_1">数值类型</a></li>
+<li><a href="#_2">指针 &amp;&amp; 数组</a><ul>
+<li><a href="#ccstring">C.CString</a></li>
+<li><a href="#ccbytes">C.CBytes</a></li>
+<li><a href="#cgostring">C.GoString</a></li>
+</ul>
+</li>
+<li><a href="#_3">复杂类型（结构体）</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<h1 id="go163-cgo">Go1.6.3 - cgo</h1>
+<h2 id="c">引入C代码</h2>
+<p>若想在Go代码中使用C代码，必须在所使用的包头开头中注释处引入，紧接着下一行导入C包 <code>import "C"</code>，即可导入C中定义&amp;实现的函数及变量。<code>"C"</code> 包并不真正存在的包，它是个伪Go包类似命名空间，能直接调用C代码导出的任何变量及函数。</p>
+<h3 id="1-go">1. Go中直接引入</h3>
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="c1">// #include &lt;stdio.h&gt;</span>
+<span class="cm">/*</span>
+<span class="cm">int foo()</span>
+<span class="cm">{</span>
+<span class="cm">    printf(&quot;Hello Cgo!\n&quot;);</span>
+<span class="cm">}</span>
+<span class="cm">*/</span>
+<span class="kn">import</span> <span class="s">&quot;C&quot;</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">C</span><span class="p">.</span><span class="nx">foo</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="nv">$ </span>go run test.go
+Hello Cgo!
+</pre></div>
+
+
+<h3 id="2-goc">2. 在Go中引入C文件</h3>
+<div class="hlcode"><pre><span class="c1">// test.c</span>
+<span class="cp">#include &lt;stdio.h&gt;</span>
+<span class="kt">void</span> <span class="nf">foo</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">printf</span><span class="p">(</span><span class="s">&quot;Hello Cgo!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="c1">// test.go</span>
+<span class="kn">package</span> <span class="nx">main</span>
+
+<span class="c1">// #include &quot;test.c&quot;</span>
+<span class="kn">import</span> <span class="s">&quot;C&quot;</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">C</span><span class="p">.</span><span class="nx">foo</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="nv">$ </span>go run test.go
+Hello Cgo!
+</pre></div>
+
+
+<h3 id="3-go">3. 在Go中引入静态链接库</h3>
+<div class="hlcode"><pre><span class="c1">// test.h</span>
+<span class="cp">#ifndef _TEST_H_</span>
+<span class="cp">#define _TEST_H_</span>
+
+<span class="cp">#include &lt;stdio.h&gt;</span>
+
+<span class="kt">void</span> <span class="nf">foo</span><span class="p">();</span>
+
+<span class="cp">#endif</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="c1">// test.c</span>
+<span class="cp">#include &quot;test.h&quot;</span>
+
+<span class="kt">void</span> <span class="nf">foo</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">printf</span><span class="p">(</span><span class="s">&quot;Hello Cgo!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="c"># 生成静态链接库</span>
+<span class="nv">$ </span>gcc -c test.c <span class="o">&amp;&amp;</span> ar -rv libtest.a test.o
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="c1">// #cgo LDFLAGS: -L./ -ltest</span>
+<span class="c1">// #include &quot;test.h&quot;</span>
+<span class="kn">import</span> <span class="s">&quot;C&quot;</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">C</span><span class="p">.</span><span class="nx">foo</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="nv">$ </span>go run test.go
+Hello Cgo!
+</pre></div>
+
+
+<h3 id="4-go">4. 在Go中引入动态链接库</h3>
+<div class="hlcode"><pre><span class="c"># 生成动态链接库</span>
+<span class="nv">$ </span>gcc -fPIC -shared test.c -o libtest.so
+<span class="nv">$ </span>sudo cp libtest.so /usr/lib
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="c1">// #cgo LDFLAGS: -ltest</span>
+<span class="c1">// #include &quot;test.h&quot;</span>
+<span class="kn">import</span> <span class="s">&quot;C&quot;</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">C</span><span class="p">.</span><span class="nx">foo</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="nv">$ </span>go run test.go
+Hello Cgo!
+</pre></div>
+
+
+<p><code>// #cgo LDFLAGS: -L. -ltest</code> 指定当前目录去搜索动态链接库会报错误，无法运行，因此将动态链接库移至 <code>/usr/lib</code> 目录下。</p>
+<h2 id="_1">数值类型</h2>
+<div class="hlcode"><pre> <span class="n">C</span><span class="p">.</span><span class="kt">char</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="n">schar</span> <span class="p">(</span><span class="kt">signed</span> <span class="kt">char</span><span class="p">),</span> <span class="n">C</span><span class="p">.</span><span class="n">uchar</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">char</span><span class="p">),</span> <span class="n">C</span><span class="p">.</span><span class="kt">short</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="n">ushort</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">short</span><span class="p">),</span> <span class="n">C</span><span class="p">.</span><span class="kt">int</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="n">uint</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">int</span><span class="p">),</span> <span class="n">C</span><span class="p">.</span><span class="kt">long</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="n">ulong</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">long</span><span class="p">),</span> <span class="n">C</span><span class="p">.</span><span class="n">longlong</span> <span class="p">(</span><span class="kt">long</span> <span class="kt">long</span><span class="p">),</span> <span class="n">C</span><span class="p">.</span><span class="n">ulonglong</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">long</span> <span class="kt">long</span><span class="p">),</span> <span class="n">C</span><span class="p">.</span><span class="kt">float</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="kt">double</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="n">complexfloat</span> <span class="p">(</span><span class="n">complex</span> <span class="kt">float</span><span class="p">),</span> <span class="n">and</span> <span class="n">C</span><span class="p">.</span><span class="n">complexdouble</span> <span class="p">(</span><span class="n">complex</span> <span class="kt">double</span><span class="p">).</span>
+</pre></div>
+
+
+<h2 id="_2">指针 &amp;&amp; 数组</h2>
+<div class="hlcode"><pre> <span class="c1">// Go string to C string</span>
+ <span class="c1">// The C string is allocated in the C heap using malloc.</span>
+ <span class="c1">// It is the caller&#39;s responsibility to arrange for it to be</span>
+ <span class="c1">// freed, such as by calling C.free (be sure to include stdlib.h</span>
+ <span class="c1">// if C.free is needed).</span>
+ <span class="n">func</span> <span class="n">C</span><span class="p">.</span><span class="n">CString</span><span class="p">(</span><span class="n">string</span><span class="p">)</span> <span class="o">*</span><span class="n">C</span><span class="p">.</span><span class="kt">char</span>
+
+ <span class="c1">// Go []byte slice to C array</span>
+ <span class="c1">// The C array is allocated in the C heap using malloc.</span>
+ <span class="c1">// It is the caller&#39;s responsibility to arrange for it to be</span>
+ <span class="c1">// freed, such as by calling C.free (be sure to include stdlib.h</span>
+ <span class="c1">// if C.free is needed).</span>
+ <span class="n">func</span> <span class="n">C</span><span class="p">.</span><span class="n">CBytes</span><span class="p">([]</span><span class="n">byte</span><span class="p">)</span> <span class="n">unsafe</span><span class="p">.</span><span class="n">Pointer</span>
+
+ <span class="c1">// C string to Go string</span>
+ <span class="n">func</span> <span class="n">C</span><span class="p">.</span><span class="n">GoString</span><span class="p">(</span><span class="o">*</span><span class="n">C</span><span class="p">.</span><span class="kt">char</span><span class="p">)</span> <span class="n">string</span>
+
+ <span class="c1">// C data with explicit length to Go string</span>
+ <span class="n">func</span> <span class="n">C</span><span class="p">.</span><span class="n">GoStringN</span><span class="p">(</span><span class="o">*</span><span class="n">C</span><span class="p">.</span><span class="kt">char</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="kt">int</span><span class="p">)</span> <span class="n">string</span>
+
+ <span class="c1">// C data with explicit length to Go []byte</span>
+ <span class="n">func</span> <span class="n">C</span><span class="p">.</span><span class="n">GoBytes</span><span class="p">(</span><span class="n">unsafe</span><span class="p">.</span><span class="n">Pointer</span><span class="p">,</span> <span class="n">C</span><span class="p">.</span><span class="kt">int</span><span class="p">)</span> <span class="p">[]</span><span class="n">byte</span>
+</pre></div>
+
+
+<p>引自：<a href="https://golang.org/cmd/cgo/#hdr-Go_references_to_C" title="Go references to C">Go references to C</a></p>
+<h3 id="ccstring">C.CString</h3>
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="c1">// #include &lt;stdio.h&gt;</span>
+<span class="c1">// #include &lt;stdlib.h&gt;</span>
+<span class="cm">/*</span>
+<span class="cm">void print(char *buff)</span>
+<span class="cm">{</span>
+<span class="cm">    printf(&quot;%s\n&quot;, buff);</span>
+<span class="cm">}</span>
+<span class="cm">*/</span>
+<span class="kn">import</span> <span class="s">&quot;C&quot;</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;unsafe&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">say</span> <span class="kt">string</span> <span class="p">=</span> <span class="s">&quot;Hello Cgo!&quot;</span>
+    <span class="nx">cSay</span> <span class="o">:=</span> <span class="nx">C</span><span class="p">.</span><span class="nx">CString</span><span class="p">(</span><span class="nx">say</span><span class="p">)</span>
+    <span class="k">defer</span> <span class="nx">C</span><span class="p">.</span><span class="nx">free</span><span class="p">(</span><span class="nx">unsafe</span><span class="p">.</span><span class="nx">Pointer</span><span class="p">(</span><span class="nx">cSay</span><span class="p">))</span>
+    <span class="nx">C</span><span class="p">.</span><span class="nb">print</span><span class="p">(</span><span class="nx">cSay</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="nv">$ </span>go run test.go
+Hello Cgo!
+</pre></div>
+
+
+<h3 id="ccbytes">C.CBytes</h3>
+<p>此函数在 Go1.7.x 被引入，对于 Go1.7.x 之前的版本，需要从 Go1.7.x 中复制一份 C.CBytes 的实现</p>
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+<span class="c1">// #include &lt;stdio.h&gt;</span>
+<span class="c1">// #include &lt;stdlib.h&gt;</span>
+<span class="c1">// #include &lt;unistd.h&gt;</span>
+<span class="kn">import</span> <span class="s">&quot;C&quot;</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;unsafe&quot;</span>
+<span class="p">)</span>
+
+<span class="c1">// _Cfunc_CBytes copy by go 1.7.x</span>
+<span class="kd">func</span> <span class="nx">_Cfunc_CBytes</span><span class="p">(</span><span class="nx">b</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="nx">unsafe</span><span class="p">.</span><span class="nx">Pointer</span> <span class="p">{</span>
+    <span class="nx">p</span> <span class="o">:=</span> <span class="nx">C</span><span class="p">.</span><span class="nx">malloc</span><span class="p">(</span><span class="nx">C</span><span class="p">.</span><span class="nx">size_t</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nx">b</span><span class="p">)))</span>
+    <span class="nx">pp</span> <span class="o">:=</span> <span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">]</span><span class="kt">byte</span><span class="p">)(</span><span class="nx">p</span><span class="p">)</span>
+    <span class="nb">copy</span><span class="p">(</span><span class="nx">pp</span><span class="p">[:],</span> <span class="nx">b</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">p</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="p">(</span>
+        <span class="nx">buff</span>  <span class="p">[]</span><span class="kt">byte</span> <span class="p">=</span> <span class="p">[]</span><span class="nb">byte</span><span class="p">(</span><span class="s">&quot;Hello Cgo!&quot;</span><span class="p">)</span>
+        <span class="nx">cBuff</span> <span class="nx">unsafe</span><span class="p">.</span><span class="nx">Pointer</span>
+    <span class="p">)</span>
+    <span class="nx">cBuff</span> <span class="p">=</span> <span class="nx">_Cfunc_CBytes</span><span class="p">(</span><span class="nx">buff</span><span class="p">)</span>
+    <span class="k">defer</span> <span class="nx">C</span><span class="p">.</span><span class="nx">free</span><span class="p">(</span><span class="nx">cBuff</span><span class="p">)</span>
+    <span class="nx">C</span><span class="p">.</span><span class="nx">write</span><span class="p">(</span><span class="nx">C</span><span class="p">.</span><span class="nx">STDOUT_FILENO</span><span class="p">,</span> <span class="nx">cBuff</span><span class="p">,</span> <span class="nx">C</span><span class="p">.</span><span class="nx">size_t</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nx">buff</span><span class="p">)))</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<div class="hlcode"><pre><span class="nv">$ </span>go run test.go
+Hello Cgo!
+</pre></div>
+
+
+<p>参考：<a href="http://stackoverflow.com/questions/35673161/convert-go-byte-to-a-c-char#35675259" title="Convert Go []byte to a C *char">Convert Go []byte to a C *char</a></p>
+<h3 id="cgostring">C.GoString</h3>
+<div class="hlcode"><pre><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="c1">// #include &lt;stdio.h&gt;</span>
+<span class="c1">// #include &lt;stdlib.h&gt;</span>
+<span class="c1">// #include &lt;string.h&gt;</span>
+<span class="cm">/*</span>
+<span class="cm">void say(char **buff)</span>
+<span class="cm">{</span>
+<span class="cm">    *buff = (char *)malloc(sizeof(char) * 11);</span>
+<span class="cm">    strncpy(*buff, &quot;Hello Cgo!&quot;, 11);</span>
+<span class="cm">}</span>
+<span class="cm">*/</span>
+<span class="kn">import</span> <span class="s">&quot;C&quot;</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;fmt&quot;</span>
+    <span class="s">&quot;unsafe&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">str</span> <span class="o">*</span><span class="nx">C</span><span class="p">.</span><span class="nx">char</span>
+    <span class="nx">C</span><span class="p">.</span><span class="nx">say</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">str</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">str</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span>
+    <span class="p">}</span>
+    <span class="k">defer</span> <span class="nx">C</span><span class="p">.</span><span class="nx">free</span><span class="p">(</span><span class="nx">unsafe</span><span class="p">.</span><span class="nx">Pointer</span><span class="p">(</span><span class="nx">str</span><span class="p">))</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">C</span><span class="p">.</span><span class="nx">GoString</span><span class="p">(</span><span class="nx">str</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<h2 id="_3">复杂类型（结构体）</h2>
+<p>参考资料：
+https://golang.org/cmd/cgo/
+http://cholerae.com/2015/05/17/%E4%BD%BF%E7%94%A8Cgo%E7%9A%84%E4%B8%80%E7%82%B9%E6%80%BB%E7%BB%93/
+http://ybxu-123.blog.163.com/blog/static/594737702014818113159247/
+http://blog.csdn.net/a600423444/article/details/7206015</p>
+    </div>
+    <div id="footer">
+      <span>
+        <p>Copyright © 2017 SinnerA.
+        Powered by <a href="http://simiki.org/" target="_blank">Simiki</a>.</p>
+        <p>Site Generated 2017-05-16 07:07:13</p>
+      </span>
+    </div>
+  </body>
+</html>
